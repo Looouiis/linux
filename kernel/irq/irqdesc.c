@@ -655,7 +655,7 @@ void irq_mark_irq(unsigned int irq)
 
 #endif /* !CONFIG_SPARSE_IRQ */
 
-int handle_irq_desc(struct irq_desc *desc)
+__attribute__((optimize("O0"))) int handle_irq_desc(struct irq_desc *desc)
 {
 	struct irq_data *data;
 
@@ -720,9 +720,10 @@ EXPORT_SYMBOL_GPL(generic_handle_irq_safe);
  * 		This function must be called from an IRQ context with irq regs
  * 		initialized.
  */
-int generic_handle_domain_irq(struct irq_domain *domain, irq_hw_number_t hwirq)
+__attribute__((optimize("O0"))) int generic_handle_domain_irq(struct irq_domain *domain, irq_hw_number_t hwirq)
 {
-	return handle_irq_desc(irq_resolve_mapping(domain, hwirq));
+	struct irq_desc *desc = irq_resolve_mapping(domain, hwirq);
+	return handle_irq_desc(desc);
 }
 EXPORT_SYMBOL_GPL(generic_handle_domain_irq);
 

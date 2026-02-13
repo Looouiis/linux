@@ -1,3 +1,4 @@
+extern struct folio* ls_folio;
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (C) 1991, 1992 Linus Torvalds
@@ -623,8 +624,9 @@ static inline blk_status_t blk_check_zone_append(struct request_queue *q,
 	return BLK_STS_OK;
 }
 
-static void __submit_bio(struct bio *bio)
+__attribute__((optimize("O0"))) static void __submit_bio(struct bio *bio)
 {
+	int is_locked = 999;
 	/* If plug is not used, add new plug here to cache nsecs time. */
 	struct blk_plug plug;
 
@@ -648,7 +650,9 @@ static void __submit_bio(struct bio *bio)
 		blk_queue_exit(disk->queue);
 	}
 
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 	blk_finish_plug(&plug);
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 }
 
 /*
@@ -714,20 +718,24 @@ static void __submit_bio_noacct(struct bio *bio)
 	current->bio_list = NULL;
 }
 
-static void __submit_bio_noacct_mq(struct bio *bio)
+__attribute__((optimize("O0"))) static void __submit_bio_noacct_mq(struct bio *bio)
 {
 	struct bio_list bio_list[2] = { };
 
 	current->bio_list = bio_list;
 
+	int is_locked = 999;
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 	do {
 		__submit_bio(bio);
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 	} while ((bio = bio_list_pop(&bio_list[0])));
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 
 	current->bio_list = NULL;
 }
 
-void submit_bio_noacct_nocheck(struct bio *bio, bool split)
+__attribute__((optimize("O0"))) void submit_bio_noacct_nocheck(struct bio *bio, bool split)
 {
 	blk_cgroup_bio_start(bio);
 
@@ -746,6 +754,8 @@ void submit_bio_noacct_nocheck(struct bio *bio, bool split)
 	 * to collect a list of requests submitted by a ->submit_bio method
 	 * while it is active, and then process them after it returned.
 	 */
+	int is_locked = 999;
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 	if (current->bio_list) {
 		if (split)
 			bio_list_add_head(&current->bio_list[0], bio);
@@ -756,6 +766,7 @@ void submit_bio_noacct_nocheck(struct bio *bio, bool split)
 	} else {
 		__submit_bio_noacct(bio);
 	}
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 }
 
 static blk_status_t blk_validate_atomic_write_op_size(struct request_queue *q,
@@ -779,7 +790,7 @@ static blk_status_t blk_validate_atomic_write_op_size(struct request_queue *q,
  * systems and other upper level users of the block layer should use
  * submit_bio() instead.
  */
-void submit_bio_noacct(struct bio *bio)
+__attribute__((optimize("O0"))) void submit_bio_noacct(struct bio *bio)
 {
 	struct block_device *bdev = bio->bi_bdev;
 	struct request_queue *q = bdev_get_queue(bdev);
@@ -876,7 +887,10 @@ void submit_bio_noacct(struct bio *bio)
 
 	if (blk_throtl_bio(bio))
 		return;
+	int is_locked = 999;
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 	submit_bio_noacct_nocheck(bio, false);
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 	return;
 
 not_supported:
@@ -908,8 +922,10 @@ static void bio_set_ioprio(struct bio *bio)
  * in @bio.  The bio must NOT be touched by the caller until ->bi_end_io() has
  * been called.
  */
-void submit_bio(struct bio *bio)
+__attribute__((optimize("O0"))) void submit_bio(struct bio *bio)
 {
+	int is_locked = 999;
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 	if (bio_op(bio) == REQ_OP_READ) {
 		task_io_account_read(bio->bi_iter.bi_size);
 		count_vm_events(PGPGIN, bio_sectors(bio));
@@ -918,7 +934,9 @@ void submit_bio(struct bio *bio)
 	}
 
 	bio_set_ioprio(bio);
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 	submit_bio_noacct(bio);
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 }
 EXPORT_SYMBOL(submit_bio);
 
@@ -1218,11 +1236,15 @@ struct blk_plug_cb *blk_check_plugged(blk_plug_cb_fn unplug, void *data,
 }
 EXPORT_SYMBOL(blk_check_plugged);
 
-void __blk_flush_plug(struct blk_plug *plug, bool from_schedule)
+__attribute__((optimize("O0"))) void __blk_flush_plug(struct blk_plug *plug, bool from_schedule)
 {
+	int is_locked = 999;
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 	if (!list_empty(&plug->cb_list))
 		flush_plug_callbacks(plug, from_schedule);
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 	blk_mq_flush_plug_list(plug, from_schedule);
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 	/*
 	 * Unconditionally flush out cached requests, even if the unplug
 	 * event came from schedule. Since we know hold references to the

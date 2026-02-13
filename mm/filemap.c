@@ -1181,7 +1181,7 @@ static int wake_page_function(wait_queue_entry_t *wait, unsigned mode, int sync,
 	return (flags & WQ_FLAG_EXCLUSIVE) != 0;
 }
 
-static void folio_wake_bit(struct folio *folio, int bit_nr)
+__attribute__((optimize("O0"))) static void folio_wake_bit(struct folio *folio, int bit_nr)
 {
 	wait_queue_head_t *q = folio_waitqueue(folio);
 	struct wait_page_key key;
@@ -1496,7 +1496,7 @@ static int folio_put_wait_locked(struct folio *folio, int state)
  * Context: May be called from interrupt or process context.  May not be
  * called from NMI context.
  */
-void folio_unlock(struct folio *folio)
+__attribute__((optimize("O0"))) void folio_unlock(struct folio *folio)
 {
 	/* Bit 7 allows x86 to check the byte's sign bit */
 	BUILD_BUG_ON(PG_waiters != 7);
@@ -2483,22 +2483,30 @@ retry:
 	rcu_read_unlock();
 }
 
-static int filemap_read_folio(struct file *file, filler_t filler,
+__attribute__((optimize("O0"))) static int filemap_read_folio(struct file *file, filler_t filler,
 		struct folio *folio)
 {
+	int is_locked = 999;
+	is_locked = folio_test_locked(folio);
 	bool workingset = folio_test_workingset(folio);
+	is_locked = folio_test_locked(folio);
 	unsigned long pflags;
 	int error;
 
 	/* Start the actual read. The read will unlock the page. */
 	if (unlikely(workingset))
 		psi_memstall_enter(&pflags);
+	is_locked = folio_test_locked(folio);
 	error = filler(file, folio);
+	is_locked = folio_test_locked(folio);
 	if (unlikely(workingset))
 		psi_memstall_leave(&pflags);
+	is_locked = folio_test_locked(folio);
 	if (error)
 		return error;
+	is_locked = folio_test_locked(folio);
 
+	is_locked = folio_test_locked(folio);
 	error = folio_wait_locked_killable(folio);
 	if (error)
 		return error;
@@ -4045,22 +4053,27 @@ EXPORT_SYMBOL(generic_file_mmap_prepare);
 EXPORT_SYMBOL(generic_file_readonly_mmap);
 EXPORT_SYMBOL(generic_file_readonly_mmap_prepare);
 
-static struct folio *do_read_cache_folio(struct address_space *mapping,
+__attribute__((optimize("O0"))) static struct folio *do_read_cache_folio(struct address_space *mapping,
 		pgoff_t index, filler_t filler, struct file *file, gfp_t gfp)
 {
 	struct folio *folio;
 	int err;
+	// printk("_____________________do read cache folio: at hart: %d", smp_processor_id());
+	int pid = smp_processor_id();
 
 	if (!filler)
 		filler = mapping->a_ops->read_folio;
 repeat:
+	int is_locked = 999;
 	folio = filemap_get_folio(mapping, index);
 	if (IS_ERR(folio)) {
 		folio = filemap_alloc_folio(gfp, mapping_min_folio_order(mapping), NULL);
+		is_locked = folio_test_locked(folio);
 		if (!folio)
 			return ERR_PTR(-ENOMEM);
 		index = mapping_align_index(mapping, index);
 		err = filemap_add_folio(mapping, folio, index, gfp);
+		is_locked = folio_test_locked(folio);
 		if (unlikely(err)) {
 			folio_put(folio);
 			if (err == -EEXIST)
@@ -4093,6 +4106,8 @@ repeat:
 	}
 
 filler:
+	is_locked = 999;
+	is_locked = folio_test_locked(folio);
 	err = filemap_read_folio(file, filler, folio);
 	if (err) {
 		folio_put(folio);

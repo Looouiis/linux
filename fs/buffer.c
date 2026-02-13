@@ -2379,6 +2379,7 @@ bool block_is_partially_uptodate(struct folio *folio, size_t from, size_t count)
 }
 EXPORT_SYMBOL(block_is_partially_uptodate);
 
+struct folio *ls_folio = 0x0;
 /*
  * Generic "read_folio" function for block devices that have the normal
  * get_block functionality. This is most of the block device filesystems.
@@ -2386,8 +2387,11 @@ EXPORT_SYMBOL(block_is_partially_uptodate);
  * set/clear_buffer_uptodate() functions propagate buffer state into the
  * folio once IO has completed.
  */
-int block_read_full_folio(struct folio *folio, get_block_t *get_block)
+__attribute__((optimize("O0"))) int block_read_full_folio(struct folio *folio, get_block_t *get_block)
 {
+	int is_locked = 999;
+	is_locked = folio_test_locked(folio);
+	ls_folio = folio;
 	struct inode *inode = folio->mapping->host;
 	sector_t iblock, lblock;
 	struct buffer_head *bh, *head, *prev = NULL;
@@ -2457,11 +2461,13 @@ int block_read_full_folio(struct folio *folio, get_block_t *get_block)
 	 * end_buffer_async_read() will never be called on any buffer
 	 * in this folio.
 	 */
+	is_locked = folio_test_locked(folio);
 	if (prev)
 		submit_bh(REQ_OP_READ, prev);
 	else
 		folio_end_read(folio, !page_error);
 
+	is_locked = folio_test_locked(folio);
 	return 0;
 }
 EXPORT_SYMBOL(block_read_full_folio);
@@ -2777,10 +2783,11 @@ static void end_bio_bh_io_sync(struct bio *bio)
 	bio_put(bio);
 }
 
-static void submit_bh_wbc(blk_opf_t opf, struct buffer_head *bh,
+__attribute__((optimize("O0"))) static void submit_bh_wbc(blk_opf_t opf, struct buffer_head *bh,
 			  enum rw_hint write_hint,
 			  struct writeback_control *wbc)
 {
+	int is_locked = 999;
 	const enum req_op op = opf & REQ_OP_MASK;
 	struct bio *bio;
 
@@ -2821,6 +2828,7 @@ static void submit_bh_wbc(blk_opf_t opf, struct buffer_head *bh,
 		wbc_account_cgroup_owner(wbc, bh->b_folio, bh->b_size);
 	}
 
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 	submit_bio(bio);
 }
 

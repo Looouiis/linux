@@ -505,7 +505,7 @@ static struct vring_desc *alloc_indirect_split(struct virtqueue *_vq,
 	return desc;
 }
 
-static inline unsigned int virtqueue_add_desc_split(struct virtqueue *vq,
+__attribute__((optimize("O0"))) static inline unsigned int virtqueue_add_desc_split(struct virtqueue *vq,
 						    struct vring_desc *desc,
 						    struct vring_desc_extra *extra,
 						    unsigned int i,
@@ -2300,7 +2300,7 @@ static inline int virtqueue_add(struct virtqueue *_vq,
  * buffer to a full VQ. It indicates that some buffers are outstanding and that
  * the operation can be retried after some buffers have been used.
  */
-int virtqueue_add_sgs(struct virtqueue *_vq,
+__attribute__((optimize("O0"))) int virtqueue_add_sgs(struct virtqueue *_vq,
 		      struct scatterlist *sgs[],
 		      unsigned int out_sgs,
 		      unsigned int in_sgs,

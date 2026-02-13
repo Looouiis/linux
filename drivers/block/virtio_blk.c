@@ -1,3 +1,4 @@
+extern struct folio* ls_folio;
 // SPDX-License-Identifier: GPL-2.0-only
 //#define DEBUG
 #include <linux/spinlock.h>
@@ -136,7 +137,7 @@ static inline struct virtio_blk_vq *get_virtio_blk_vq(struct blk_mq_hw_ctx *hctx
 	return vq;
 }
 
-static int virtblk_add_req(struct virtqueue *vq, struct virtblk_req *vbr)
+__attribute__((optimize("O0"))) static int virtblk_add_req(struct virtqueue *vq, struct virtblk_req *vbr)
 {
 	struct scatterlist out_hdr, in_hdr, *sgs[3];
 	unsigned int num_out = 0, num_in = 0;
@@ -423,9 +424,14 @@ static blk_status_t virtblk_prep_rq(struct blk_mq_hw_ctx *hctx,
 	return BLK_STS_OK;
 }
 
-static blk_status_t virtio_queue_rq(struct blk_mq_hw_ctx *hctx,
+int test_is_locked(struct folio *folio) {
+	return folio_test_locked(folio);
+}
+__attribute__((optimize("O0"))) static blk_status_t virtio_queue_rq(struct blk_mq_hw_ctx *hctx,
 			   const struct blk_mq_queue_data *bd)
 {
+	int is_locked = 999;
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 	struct virtio_blk *vblk = hctx->queue->queuedata;
 	struct request *req = bd->rq;
 	struct virtblk_req *vbr = blk_mq_rq_to_pdu(req);
@@ -440,7 +446,20 @@ static blk_status_t virtio_queue_rq(struct blk_mq_hw_ctx *hctx,
 		return status;
 
 	spin_lock_irqsave(&vblk->vqs[qid].lock, flags);
+	if(ls_folio) {
+		const struct page *page = &ls_folio->page;
+		unsigned long *flag = &(page[0].flags.f);
+		is_locked = test_bit(0, flag);
+	}
 	err = virtblk_add_req(vblk->vqs[qid].vq, vbr);
+	// if(ls_folio) is_locked = folio_test_locked(ls_folio);
+	if(ls_folio) {
+		const struct page *page = &ls_folio->page;
+		unsigned long *flag = &(page[0].flags.f);
+		is_locked = test_bit(0, flag);
+		struct page page2 = *page;
+		// __asm__("ecall");
+	}
 	if (err) {
 		virtqueue_kick(vblk->vqs[qid].vq);
 		/* Don't stop the queue if -ENOMEM: we may have failed to
@@ -455,7 +474,9 @@ static blk_status_t virtio_queue_rq(struct blk_mq_hw_ctx *hctx,
 
 	if (bd->last && virtqueue_kick_prepare(vblk->vqs[qid].vq))
 		notify = true;
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 	spin_unlock_irqrestore(&vblk->vqs[qid].lock, flags);
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 
 	if (notify)
 		virtqueue_notify(vblk->vqs[qid].vq);
@@ -1694,6 +1715,7 @@ static int __init virtio_blk_init(void)
 {
 	int error;
 
+	printk("virtio blk inittttttttttttttttttttttttttttttttttttttttttt\n");
 	virtblk_wq = alloc_workqueue("virtio-blk", WQ_PERCPU, 0);
 	if (!virtblk_wq)
 		return -ENOMEM;
@@ -1704,7 +1726,9 @@ static int __init virtio_blk_init(void)
 		goto out_destroy_workqueue;
 	}
 
+	printk("trying to register\n");
 	error = register_virtio_driver(&virtio_blk);
+	printk("register code %d\n", error);
 	if (error)
 		goto out_unregister_blkdev;
 	return 0;

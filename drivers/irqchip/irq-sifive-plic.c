@@ -372,7 +372,7 @@ static const struct irq_domain_ops plic_irqdomain_ops = {
  * that source ID back to the same claim register.  This automatically enables
  * and disables the interrupt, so there's nothing else to do.
  */
-static void plic_handle_irq(struct irq_desc *desc)
+__attribute__((optimize("O0"))) static void plic_handle_irq(struct irq_desc *desc)
 {
 	struct plic_handler *handler = this_cpu_ptr(&plic_handlers);
 	struct irq_chip *chip = irq_desc_get_chip(desc);

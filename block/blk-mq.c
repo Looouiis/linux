@@ -1,3 +1,4 @@
+extern struct folio* ls_folio;
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Block multiqueue core code
@@ -2103,9 +2104,11 @@ static void blk_mq_commit_rqs(struct blk_mq_hw_ctx *hctx, int queued,
 /*
  * Returns true if we did some work AND can potentially do more.
  */
-bool blk_mq_dispatch_rq_list(struct blk_mq_hw_ctx *hctx, struct list_head *list,
+__attribute__((optimize("O0"))) bool blk_mq_dispatch_rq_list(struct blk_mq_hw_ctx *hctx, struct list_head *list,
 			     bool get_budget)
 {
+	int is_locked = 999;
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 	enum prep_dispatch prep;
 	struct request_queue *q = hctx->queue;
 	struct request *rq;
@@ -2135,7 +2138,9 @@ bool blk_mq_dispatch_rq_list(struct blk_mq_hw_ctx *hctx, struct list_head *list,
 		bd.rq = rq;
 		bd.last = list_empty(list);
 
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 		ret = q->mq_ops->queue_rq(hctx, &bd);
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 		switch (ret) {
 		case BLK_STS_OK:
 			queued++;
@@ -2339,9 +2344,11 @@ static inline bool blk_mq_hw_queue_need_run(struct blk_mq_hw_ctx *hctx)
  * pending requests to be sent. If this is true, run the queue to send requests
  * to hardware.
  */
-void blk_mq_run_hw_queue(struct blk_mq_hw_ctx *hctx, bool async)
+__attribute__((optimize("O0"))) void blk_mq_run_hw_queue(struct blk_mq_hw_ctx *hctx, bool async)
 {
 	bool need_run;
+	int is_locked = 999;
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 
 	/*
 	 * We can't run the queue inline with interrupts disabled.
@@ -2373,8 +2380,11 @@ void blk_mq_run_hw_queue(struct blk_mq_hw_ctx *hctx, bool async)
 		return;
 	}
 
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 	blk_mq_run_dispatch_ops(hctx->queue,
 				blk_mq_sched_dispatch_requests(hctx));
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 }
 EXPORT_SYMBOL(blk_mq_run_hw_queue);
 
@@ -2898,8 +2908,10 @@ static void blk_mq_dispatch_queue_requests(struct rq_list *rqs, unsigned depth)
 	blk_mq_run_dispatch_ops(q, blk_mq_issue_direct(rqs));
 }
 
-static void blk_mq_dispatch_list(struct rq_list *rqs, bool from_sched)
+__attribute__((optimize("O0"))) static void blk_mq_dispatch_list(struct rq_list *rqs, bool from_sched)
 {
+	int is_locked = 999;
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 	struct blk_mq_hw_ctx *this_hctx = NULL;
 	struct blk_mq_ctx *this_ctx = NULL;
 	struct rq_list requeue_list = {};
@@ -2936,10 +2948,13 @@ static void blk_mq_dispatch_list(struct rq_list *rqs, bool from_sched)
 	} else if (this_hctx->queue->elevator) {
 		this_hctx->queue->elevator->type->ops.insert_requests(this_hctx,
 				&list, 0);
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 		blk_mq_run_hw_queue(this_hctx, from_sched);
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 	} else {
 		blk_mq_insert_requests(this_hctx, this_ctx, &list, from_sched);
 	}
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 	percpu_ref_put(&this_hctx->queue->q_usage_counter);
 }
 
@@ -2956,9 +2971,11 @@ static void blk_mq_dispatch_multiple_queue_requests(struct rq_list *rqs)
 	} while (!rq_list_empty(rqs));
 }
 
-void blk_mq_flush_plug_list(struct blk_plug *plug, bool from_schedule)
+__attribute__((optimize("O0"))) void blk_mq_flush_plug_list(struct blk_plug *plug, bool from_schedule)
 {
 	unsigned int depth;
+	int is_locked = 999;
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 
 	/*
 	 * We may have been called recursively midway through handling

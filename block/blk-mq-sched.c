@@ -1,3 +1,4 @@
+extern struct folio* ls_folio;
 // SPDX-License-Identifier: GPL-2.0
 /*
  * blk-mq scheduling framework
@@ -82,8 +83,10 @@ dispatch:
  * Returns -EAGAIN if hctx->dispatch was found non-empty and run_work has to
  * be run again.  This is necessary to avoid starving flushes.
  */
-static int __blk_mq_do_dispatch_sched(struct blk_mq_hw_ctx *hctx)
+__attribute__((optimize("O0"))) static int __blk_mq_do_dispatch_sched(struct blk_mq_hw_ctx *hctx)
 {
+	int is_locked = 999;
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 	struct request_queue *q = hctx->queue;
 	struct elevator_queue *e = q->elevator;
 	bool multi_hctxs = false, run_queue = false;
@@ -165,7 +168,9 @@ static int __blk_mq_do_dispatch_sched(struct blk_mq_hw_ctx *hctx)
 			dispatched |= blk_mq_dispatch_hctx_list(&rq_list);
 		} while (!list_empty(&rq_list));
 	} else {
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 		dispatched = blk_mq_dispatch_rq_list(hctx, &rq_list, false);
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 	}
 
 	if (busy)
@@ -265,8 +270,10 @@ static int blk_mq_do_dispatch_ctx(struct blk_mq_hw_ctx *hctx)
 	return ret;
 }
 
-static int __blk_mq_sched_dispatch_requests(struct blk_mq_hw_ctx *hctx)
+__attribute__((optimize("O0"))) static int __blk_mq_sched_dispatch_requests(struct blk_mq_hw_ctx *hctx)
 {
+	int is_locked = 999;
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 	bool need_dispatch = false;
 	LIST_HEAD(rq_list);
 
@@ -314,9 +321,11 @@ static int __blk_mq_sched_dispatch_requests(struct blk_mq_hw_ctx *hctx)
 	return 0;
 }
 
-void blk_mq_sched_dispatch_requests(struct blk_mq_hw_ctx *hctx)
+__attribute__((optimize("O0"))) void blk_mq_sched_dispatch_requests(struct blk_mq_hw_ctx *hctx)
 {
 	struct request_queue *q = hctx->queue;
+	int is_locked = 999;
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 
 	/* RCU or SRCU read lock is needed before checking quiesced flag */
 	if (unlikely(blk_mq_hctx_stopped(hctx) || blk_queue_quiesced(q)))
@@ -330,6 +339,8 @@ void blk_mq_sched_dispatch_requests(struct blk_mq_hw_ctx *hctx)
 		if (__blk_mq_sched_dispatch_requests(hctx) == -EAGAIN)
 			blk_mq_run_hw_queue(hctx, true);
 	}
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
+	if(ls_folio) is_locked = folio_test_locked(ls_folio);
 }
 
 bool blk_mq_sched_bio_merge(struct request_queue *q, struct bio *bio,

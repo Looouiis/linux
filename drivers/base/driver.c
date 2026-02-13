@@ -224,6 +224,7 @@ void driver_remove_groups(const struct device_driver *drv,
  */
 int driver_register(struct device_driver *drv)
 {
+	// printk("into driver_register\n");
 	int ret;
 	struct device_driver *other;
 
